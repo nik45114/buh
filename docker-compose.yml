@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: accounting_postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=ru_RU.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    ports:
+      - "5432:5432"
+    networks:
+      - accounting_net
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  bot:
+    build: .
+    container_name: accounting_bot
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app/app
+      - ./documents:/app/documents
+      - ./backups:/backups
+      - ./templates:/app/templates
+    networks:
+      - accounting_net
+    restart: always
+    command: python -m app.main
+
+  api:
+    build: .
+    container_name: accounting_api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "${API_PORT}:8000"
+    volumes:
+      - ./app:/app/app
+    networks:
+      - accounting_net
+    restart: always
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+
+networks:
+  accounting_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
