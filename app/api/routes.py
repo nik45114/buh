@@ -6,13 +6,24 @@ from app.api.schemas import ShiftReportSchema, TransactionSchema, ResponseSchema
 from app.database.db import async_session_maker
 from app.database import crud
 from app.config import settings
-from datetime import datetime
+from datetime import datetime, date as date_type
 from decimal import Decimal
+from pydantic import BaseModel
+from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# Schema для проверки смены
+class ShiftCheckSchema(BaseModel):
+    date: date_type
+    cash: float
+    cashless: float
+    qr: float = 0.0
+    kkt_number: Optional[str] = None
 
 
 def verify_api_key(x_api_key: str = Header(..., alias="X-API-Key")):
@@ -97,6 +108,59 @@ async def receive_shift_report(
     except Exception as e:
         logger.error(f"Error processing shift report: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/check-shift")
+async def check_shift_with_ofd(
+    check_data: ShiftCheckSchema,
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    Проверить смену с данными онлайн-кассы СБИС ОФД
+
+    - **date**: Дата смены
+    - **cash**: Фактические наличные
+    - **cashless**: Фактический безнал
+    - **qr**: QR платежи
+    - **kkt_number**: Номер ККТ (опционально)
+
+    Возвращает результат сверки с кассой
+    """
+    try:
+        from app.services.sbis_ofd import validate_shift_with_ofd, get_shift_validation_report
+
+        # Проверить с СБИС ОФД
+        validation = await validate_shift_with_ofd(
+            shift_date=check_data.date,
+            fact_cash=check_data.cash,
+            fact_cashless=check_data.cashless,
+            fact_qr=check_data.qr,
+            kkt_number=check_data.kkt_number
+        )
+
+        # Получить полный отчет
+        report = await get_shift_validation_report(
+            shift_date=check_data.date,
+            fact_cash=check_data.cash,
+            fact_cashless=check_data.cashless,
+            fact_qr=check_data.qr,
+            kkt_number=check_data.kkt_number
+        )
+
+        return {
+            "status": validation.get("status", "error"),
+            "is_closed": validation.get("is_closed", False),
+            "message": validation.get("message", ""),
+            "discrepancies": validation.get("discrepancies"),
+            "report": report
+        }
+
+    except Exception as e:
+        logger.error(f"Error checking shift with OFD: {e}")
+        return {
+            "status": "error",
+            "message": f"Ошибка проверки с СБИС ОФД: {str(e)}"
+        }
 
 
 @router.post("/transaction", response_model=ResponseSchema)

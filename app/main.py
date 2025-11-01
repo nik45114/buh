@@ -10,7 +10,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from app.config import settings
 from app.database.db import init_db, close_db
-from app.bot.handlers import owner, admin, common, receipt, employees, payroll
+from app.bot.handlers import owner, admin, common, receipt, employees, payroll, ofd_check
 from app.services.scheduler import setup_scheduler, start_scheduler, stop_scheduler
 
 # Настройка логирования
@@ -48,6 +48,7 @@ async def start_bot():
         dp.include_router(admin.router)  # Админы
         dp.include_router(employees.router)  # Сотрудники
         dp.include_router(payroll.router)  # Зарплата
+        dp.include_router(ofd_check.router)  # Проверка с СБИС ОФД
         dp.include_router(receipt.router)  # Обработка фото
         dp.include_router(common.router)  # Общие команды
 
