@@ -15,9 +15,10 @@ class Settings(BaseSettings):
     ADMIN_TELEGRAM_IDS: str = "[]"
     ADMIN_CHAT_ID: int
 
-    # Claude API
-    CLAUDE_API_KEY: str
-    CLAUDE_MODEL: str = "claude-3-5-sonnet-20241022"
+    # OpenAI API
+    OPENAI_API_KEY: str
+    OPENAI_MODEL: str = "gpt-4o"  # Для OCR с изображениями
+    OPENAI_CATEGORIZER_MODEL: str = "gpt-3.5-turbo"  # Для категоризации
 
     # Database
     DB_HOST: str = "localhost"
@@ -34,6 +35,8 @@ class Settings(BaseSettings):
     # Company
     COMPANY_NAME: str = 'ООО "Лепта"'
     COMPANY_INN: str = "6829164121"
+    COMPANY_CITY: str = "Москва"
+    COMPANY_ADDRESS: str = ""
     TAX_SYSTEM: str = "usn_income_expense"
     TAX_RATE: float = 0.15
 

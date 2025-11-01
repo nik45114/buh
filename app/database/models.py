@@ -252,3 +252,234 @@ class AuditLog(Base):
 
     # Relationships
     user = relationship('User')
+
+
+class Employee(Base):
+    """Сотрудники"""
+    __tablename__ = 'employees'
+
+    id = Column(Integer, primary_key=True)
+    full_name = Column(String(255), nullable=False)
+    inn = Column(String(12), unique=True)
+    snils = Column(String(14))
+    passport_series = Column(String(4))
+    passport_number = Column(String(6))
+    passport_issued_by = Column(Text)
+    passport_issue_date = Column(Date)
+    birth_date = Column(Date)
+    birth_place = Column(Text)
+    registration_address = Column(Text)
+    phone = Column(String(20))
+    email = Column(String(255))
+    employment_type = Column(String(20))
+    hire_date = Column(Date)
+    fire_date = Column(Date)
+    hourly_rate = Column(Numeric(10, 2))
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "employment_type IN ('TD', 'GPH', 'OFFER', 'SELF_EMPLOYED')",
+            name='check_employment_type'
+        ),
+        Index('idx_employees_inn', 'inn'),
+        Index('idx_employees_employment_type', 'employment_type'),
+    )
+
+    @property
+    def is_active(self):
+        """Активный сотрудник?"""
+        return self.fire_date is None
+
+    @property
+    def full_passport(self):
+        """Полные паспортные данные"""
+        if self.passport_series and self.passport_number:
+            return f"{self.passport_series} {self.passport_number}"
+        return None
+
+
+class Contract(Base):
+    """Договоры с сотрудниками"""
+    __tablename__ = 'contracts'
+
+    id = Column(Integer, primary_key=True)
+    employee_id = Column(Integer, ForeignKey('employees.id', ondelete='CASCADE'), nullable=False)
+    contract_type = Column(String(20), nullable=False)
+    contract_number = Column(String(50))
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date)
+    position = Column(String(255))
+    salary = Column(Numeric(10, 2))
+    work_conditions = Column(Text)
+    file_path = Column(String(500))
+    created_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "contract_type IN ('TD', 'GPH', 'OFFER')",
+            name='check_contract_type'
+        ),
+        Index('idx_contracts_employee', 'employee_id'),
+        Index('idx_contracts_type', 'contract_type'),
+        Index('idx_contracts_number', 'contract_number'),
+    )
+
+    @property
+    def is_active(self):
+        """Активный договор?"""
+        from datetime import date
+        today = date.today()
+        if self.end_date is None:
+            return self.start_date <= today
+        return self.start_date <= today <= self.end_date
+
+
+class Shift(Base):
+    """Смены сотрудников"""
+    __tablename__ = 'shifts'
+
+    id = Column(Integer, primary_key=True)
+    employee_id = Column(Integer, ForeignKey('employees.id', ondelete='SET NULL'))
+    shift_date = Column(Date, nullable=False, index=True)
+    start_time = Column(DateTime)  # Changed from Time
+    end_time = Column(DateTime)    # Changed from Time
+    hours_worked = Column(Numeric(5, 2))
+    revenue = Column(Numeric(10, 2))
+    expenses = Column(Numeric(10, 2))
+    notes = Column(Text)
+    imported_from_bot = Column(Boolean, default=False)
+    bot_shift_id = Column(Integer)
+    created_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        Index('idx_shifts_employee', 'employee_id'),
+        Index('idx_shifts_date', 'shift_date'),
+        Index('idx_shifts_imported', 'imported_from_bot'),
+        Index('idx_shifts_bot_id', 'bot_shift_id', unique=True),
+    )
+
+
+class Payroll(Base):
+    """Начисления зарплаты"""
+    __tablename__ = 'payroll'
+
+    id = Column(Integer, primary_key=True)
+    employee_id = Column(Integer, ForeignKey('employees.id', ondelete='CASCADE'), nullable=False)
+    period_month = Column(Integer, nullable=False)
+    period_year = Column(Integer, nullable=False)
+    total_hours = Column(Numeric(10, 2))
+    gross_salary = Column(Numeric(10, 2))
+    ndfl = Column(Numeric(10, 2))
+    contributions = Column(Numeric(10, 2))
+    net_salary = Column(Numeric(10, 2))
+    payment_date = Column(Date)
+    status = Column(String(20), default='DRAFT', nullable=False)
+    created_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('DRAFT', 'APPROVED', 'PAID')",
+            name='check_payroll_status'
+        ),
+        CheckConstraint("period_month BETWEEN 1 AND 12", name='check_payroll_month'),
+        CheckConstraint("period_year >= 2020", name='check_payroll_year'),
+        Index('idx_payroll_employee', 'employee_id'),
+        Index('idx_payroll_period', 'period_year', 'period_month'),
+        Index('idx_payroll_status', 'status'),
+        Index('idx_payroll_unique', 'employee_id', 'period_year', 'period_month', unique=True),
+    )
+
+
+class TaxPayment(Base):
+    """Налоги и взносы"""
+    __tablename__ = 'tax_payments'
+
+    id = Column(Integer, primary_key=True)
+    tax_type = Column(String(50), nullable=False)
+    period_quarter = Column(Integer)
+    period_year = Column(Integer, nullable=False)
+    base_amount = Column(Numeric(10, 2))
+    tax_amount = Column(Numeric(10, 2), nullable=False)
+    payment_deadline = Column(Date, nullable=False, index=True)
+    payment_date = Column(Date)
+    status = Column(String(20), default='CALCULATED', nullable=False)
+    created_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "tax_type IN ('USN', 'NDFL', 'PENSION', 'MEDICAL', 'SOCIAL', 'INJURY')",
+            name='check_tax_type'
+        ),
+        CheckConstraint(
+            "status IN ('CALCULATED', 'PAID', 'OVERDUE')",
+            name='check_tax_payment_status'
+        ),
+        CheckConstraint("period_quarter BETWEEN 1 AND 4", name='check_tax_quarter'),
+        CheckConstraint("period_year >= 2020", name='check_tax_year'),
+        Index('idx_tax_payments_type', 'tax_type'),
+        Index('idx_tax_payments_status', 'status'),
+        Index('idx_tax_payments_period', 'period_year', 'period_quarter'),
+        Index('idx_tax_payments_deadline', 'payment_deadline'),
+    )
+
+
+class Report(Base):
+    """Отчеты в налоговую и фонды"""
+    __tablename__ = 'reports'
+
+    id = Column(Integer, primary_key=True)
+    report_type = Column(String(50), nullable=False)
+    period_quarter = Column(Integer)
+    period_year = Column(Integer, nullable=False)
+    file_path = Column(String(500))
+    xml_path = Column(String(500))
+    status = Column(String(20), default='DRAFT', nullable=False)
+    sent_date = Column(Date)
+    created_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "report_type IN ('USN_DECLARATION', 'RSV', 'SZV_M', 'EFS_1', 'KUDIR')",
+            name='check_report_type'
+        ),
+        CheckConstraint(
+            "status IN ('DRAFT', 'READY', 'SENT', 'ACCEPTED')",
+            name='check_report_status'
+        ),
+        CheckConstraint("period_quarter BETWEEN 1 AND 4", name='check_report_quarter'),
+        CheckConstraint("period_year >= 2020", name='check_report_year'),
+        Index('idx_reports_type', 'report_type'),
+        Index('idx_reports_status', 'status'),
+        Index('idx_reports_period', 'period_year', 'period_quarter'),
+    )
+
+
+class Reminder(Base):
+    """Напоминания о важных событиях"""
+    __tablename__ = 'reminders'
+
+    id = Column(Integer, primary_key=True)
+    reminder_type = Column(String(50), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text)
+    due_date = Column(Date, nullable=False, index=True)
+    priority = Column(String(20), default='MEDIUM', nullable=False)
+    status = Column(String(20), default='PENDING', nullable=False)
+    created_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "priority IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')",
+            name='check_reminder_priority'
+        ),
+        CheckConstraint(
+            "status IN ('PENDING', 'SENT', 'COMPLETED')",
+            name='check_reminder_status'
+        ),
+        Index('idx_reminders_type', 'reminder_type'),
+        Index('idx_reminders_status', 'status'),
+        Index('idx_reminders_priority', 'priority'),
+        Index('idx_reminders_due_date', 'due_date'),
+    )

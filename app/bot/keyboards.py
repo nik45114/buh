@@ -129,3 +129,58 @@ def get_transaction_actions_keyboard(transaction_id: int, is_confirmed: bool) ->
     )
 
     return builder.as_markup()
+
+
+def get_employees_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для работы с сотрудниками"""
+    builder = InlineKeyboardBuilder()
+
+    builder.row(
+        InlineKeyboardButton(text="➕ Добавить", callback_data="add_employee")
+    )
+    builder.row(
+        InlineKeyboardButton(text="📋 Список", callback_data="list_employees")
+    )
+
+    return builder.as_markup()
+
+
+def get_employee_card_keyboard(employee_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура карточки сотрудника"""
+    builder = InlineKeyboardBuilder()
+
+    builder.row(
+        InlineKeyboardButton(text="📝 Трудовой договор", callback_data=f"generate_contract_TD_{employee_id}"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="📄 Договор ГПХ", callback_data=f"generate_contract_GPH_{employee_id}"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="📃 Оферта", callback_data=f"generate_contract_OFFER_{employee_id}"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_employee_{employee_id}"),
+        InlineKeyboardButton(text="🗑️ Уволить", callback_data=f"fire_employee_{employee_id}")
+    )
+
+    return builder.as_markup()
+
+
+def get_contract_type_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора типа договора"""
+    builder = InlineKeyboardBuilder()
+
+    builder.row(
+        InlineKeyboardButton(text="Трудовой договор (ТД)", callback_data="employment_TD")
+    )
+    builder.row(
+        InlineKeyboardButton(text="Гражданско-правовой (ГПХ)", callback_data="employment_GPH")
+    )
+    builder.row(
+        InlineKeyboardButton(text="Оферта", callback_data="employment_OFFER")
+    )
+    builder.row(
+        InlineKeyboardButton(text="Самозанятый", callback_data="employment_SELF_EMPLOYED")
+    )
+
+    return builder.as_markup()

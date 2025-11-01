@@ -25,6 +25,9 @@ async_session_maker = sessionmaker(
     expire_on_commit=False
 )
 
+# Alias для удобства
+async_session = async_session_maker
+
 
 async def get_session() -> AsyncSession:
     """

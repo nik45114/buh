@@ -1,7 +1,7 @@
 """
-OCR сервис для распознавания чеков через Claude Vision API
+OCR сервис для распознавания чеков через OpenAI Vision API
 """
-import anthropic
+from openai import OpenAI
 from app.config import settings
 from typing import Dict, Optional
 import json
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 async def recognize_receipt(image_bytes: bytes) -> Optional[Dict]:
     """
-    Распознавание чека через Claude Vision API
+    Распознавание чека через OpenAI Vision API (GPT-4 Vision)
 
     Args:
         image_bytes: Байты изображения чека
@@ -22,12 +22,12 @@ async def recognize_receipt(image_bytes: bytes) -> Optional[Dict]:
         Dict с данными чека или None при ошибке
     """
     try:
-        client = anthropic.Anthropic(api_key=settings.CLAUDE_API_KEY)
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
         # Кодируем изображение в base64
         image_base64 = base64.b64encode(image_bytes).decode('utf-8')
 
-        # Промпт для Claude
+        # Промпт для GPT-4 Vision
         prompt = """
 Распознай чек и верни ТОЛЬКО JSON в формате:
 {
@@ -60,36 +60,33 @@ async def recognize_receipt(image_bytes: bytes) -> Optional[Dict]:
 Не добавляй никаких комментариев, только JSON.
 """
 
-        # Запрос к Claude
-        message = client.messages.create(
-            model=settings.CLAUDE_MODEL,
+        # Запрос к OpenAI GPT-4 Vision
+        response = client.chat.completions.create(
+            model="gpt-4o",  # gpt-4o поддерживает vision и дешевле
             max_tokens=1024,
             messages=[
                 {
                     "role": "user",
                     "content": [
                         {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/jpeg",
-                                "data": image_base64,
-                            },
-                        },
-                        {
                             "type": "text",
                             "text": prompt
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_base64}"
+                            }
                         }
-                    ],
+                    ]
                 }
-            ],
+            ]
         )
 
         # Парсим ответ
-        response_text = message.content[0].text
+        response_text = response.choices[0].message.content
 
         # Извлекаем JSON из ответа
-        # Claude может вернуть JSON в markdown блоке
         if "```json" in response_text:
             json_str = response_text.split("```json")[1].split("```")[0].strip()
         elif "```" in response_text:
@@ -103,7 +100,7 @@ async def recognize_receipt(image_bytes: bytes) -> Optional[Dict]:
         return receipt_data
 
     except json.JSONDecodeError as e:
-        logger.error(f"Error parsing JSON from Claude response: {e}")
+        logger.error(f"Error parsing JSON from OpenAI response: {e}")
         logger.error(f"Response text: {response_text}")
         return None
     except Exception as e:
@@ -113,7 +110,7 @@ async def recognize_receipt(image_bytes: bytes) -> Optional[Dict]:
 
 async def categorize_expense(description: str, items: list = None) -> str:
     """
-    Автоматическая категоризация расхода через Claude API
+    Автоматическая категоризация расхода через OpenAI API
 
     Args:
         description: Описание расхода
@@ -123,7 +120,7 @@ async def categorize_expense(description: str, items: list = None) -> str:
         Название категории
     """
     try:
-        client = anthropic.Anthropic(api_key=settings.CLAUDE_API_KEY)
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
         items_text = ", ".join(items) if items else "нет данных"
 
@@ -152,13 +149,13 @@ async def categorize_expense(description: str, items: list = None) -> str:
 Верни только название категории, без пояснений.
 """
 
-        message = client.messages.create(
-            model="claude-3-haiku-20240307",  # Используем быструю модель
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",  # Для простой категоризации достаточно 3.5
             max_tokens=50,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": prompt}]
         )
 
-        category = message.content[0].text.strip()
+        category = response.choices[0].message.content.strip()
         logger.info(f"Expense categorized: {description} -> {category}")
         return category
 
