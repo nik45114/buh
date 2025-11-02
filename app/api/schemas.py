@@ -82,3 +82,60 @@ class ErrorSchema(BaseModel):
     """Схема ошибки"""
     status: str = "error"
     detail: str
+
+
+class ReceiptSchema(BaseModel):
+    """Схема чека от ФНС (QR-код)"""
+    qr_data: str = Field(..., description="Данные QR-кода с чека")
+    accountable_id: Optional[int] = Field(None, description="ID подотчетной суммы (если это отчет)")
+    category: Optional[str] = Field(None, description="Категория расхода")
+    notes: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "qr_data": "t=20240115T1530&s=1500.00&fn=9999078900004792&i=12345&fp=3522207165&n=1",
+                "accountable_id": 5,
+                "category": "Канцтовары",
+                "notes": "Покупка бумаги для офиса"
+            }
+        }
+
+
+class CashWithdrawalSchema(BaseModel):
+    """Схема выдачи наличных под отчет"""
+    employee_name: str = Field(..., description="ФИО сотрудника")
+    amount: Decimal = Field(..., gt=0, description="Сумма выдачи")
+    purpose: str = Field(..., description="Назначение (на что выдано)")
+    report_deadline_days: int = Field(3, ge=1, le=30, description="Срок отчета (дней)")
+    notes: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "employee_name": "Иванов Иван Иванович",
+                "amount": 5000.00,
+                "purpose": "Закупка воды и канцтоваров",
+                "report_deadline_days": 3,
+                "notes": "Срочная закупка"
+            }
+        }
+
+
+class AccountableReportSchema(BaseModel):
+    """Схема отчета по подотчетной сумме"""
+    accountable_id: int = Field(..., description="ID подотчетной суммы")
+    receipts: List[str] = Field(..., description="QR-коды чеков")
+    notes: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "accountable_id": 5,
+                "receipts": [
+                    "t=20240115T1530&s=1500.00&fn=9999078900004792&i=12345&fp=3522207165&n=1",
+                    "t=20240115T1600&s=3500.00&fn=9999078900004792&i=12346&fp=3522207166&n=1"
+                ],
+                "notes": "Все чеки приложены"
+            }
+        }

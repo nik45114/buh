@@ -103,6 +103,8 @@ class Transaction(Base):
     creator = relationship('User', foreign_keys=[created_by], back_populates='created_transactions')
     confirmer = relationship('User', foreign_keys=[confirmed_by], back_populates='confirmed_transactions')
     documents = relationship('Document', back_populates='transaction', cascade='all, delete-orphan')
+    receipt = relationship('Receipt', back_populates='transaction', uselist=False)
+    bank_transaction = relationship('BankTransaction', back_populates='accounting_transaction', uselist=False)
 
 
 class Document(Base):

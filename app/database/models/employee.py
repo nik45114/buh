@@ -46,6 +46,7 @@ class Employee(Base):
     contracts = relationship('Contract', back_populates='employee', cascade='all, delete-orphan')
     shifts = relationship('Shift', back_populates='employee')
     payroll = relationship('Payroll', back_populates='employee')
+    accountable_records = relationship('Accountable', back_populates='employee')
 
     @property
     def is_active(self):
